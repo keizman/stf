@@ -92,7 +92,7 @@ module.exports = function DeviceScreenDirective(
         var options = {
           autoScaleForRetina: true
         , density: Math.max(1, Math.min(1.5, devicePixelRatio || 1))
-        , minscale: 0.36
+        , minscale: 0.80
         }
 
         var adjustedBoundSize
