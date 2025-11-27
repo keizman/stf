@@ -120,18 +120,24 @@ module.exports = function InstallService(
             .then(function(res) {
               if (res.data.success) {
                 installation.manifest = res.data.manifest
-                return control.install({
-                  href: installation.href,
-                  manifest: installation.manifest,
-                  launch: installation.launch
-                })
-                  .progressed(function(result) {
-                    installation.update(50 + result.progress / 2, result.lastData)
-                  })
               }
               else {
-                throw new Error('Unable to retrieve manifest')
+                // Use default manifest if unable to read from APK
+                // Installation will proceed using adb install -r -d -t
+                console.warn('Unable to retrieve manifest, using default manifest')
+                installation.manifest = {
+                  package: 'unknown',
+                  application: { launcherActivities: [] }
+                }
               }
+              return control.install({
+                href: installation.href,
+                manifest: installation.manifest,
+                launch: installation.launch
+              })
+                .progressed(function(result) {
+                  installation.update(50 + result.progress / 2, result.lastData)
+                })
             })
         }
       })

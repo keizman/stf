@@ -51,6 +51,11 @@ module.exports = function DeviceScreenDirective(
       ;(function() {
         function stop() {
           try {
+            // Clean up hidden timer
+            if (hiddenTimer) {
+              $timeout.cancel(hiddenTimer)
+              hiddenTimer = null
+            }
             ws.onerror = ws.onclose = ws.onmessage = ws.onopen = null
             ws.close()
             ws = null
@@ -97,6 +102,9 @@ module.exports = function DeviceScreenDirective(
 
         var adjustedBoundSize
         var cachedEnabled = false
+        var hiddenTimer = null
+        var shouldStopDueToHidden = false
+        var HIDDEN_DELAY = 60000 // 1 minute in milliseconds
 
         function updateBounds() {
           function adjustBoundedSize(w, h) {
@@ -158,12 +166,34 @@ module.exports = function DeviceScreenDirective(
             scope.$parent.showScreen &&
             // NO if we're not even using the device anymore.
             device.using &&
-            // NO if the page is not visible (e.g. background tab).
-            !PageVisibilityService.hidden &&
+            // NO if the page has been hidden for more than 1 minute
+            !shouldStopDueToHidden &&
             // NO if we don't have a connection yet.
             ws.readyState === WebSocket.OPEN
             // YES otherwise
           )
+        }
+
+        function handleVisibilityChange() {
+          if (PageVisibilityService.hidden) {
+            // Page became hidden, start timer
+            if (hiddenTimer) {
+              $timeout.cancel(hiddenTimer)
+            }
+            hiddenTimer = $timeout(function() {
+              // After 1 minute of being hidden, stop the screen
+              shouldStopDueToHidden = true
+              checkEnabled()
+            }, HIDDEN_DELAY)
+          } else {
+            // Page became visible, cancel timer
+            if (hiddenTimer) {
+              $timeout.cancel(hiddenTimer)
+              hiddenTimer = null
+            }
+            shouldStopDueToHidden = false
+            checkEnabled()
+          }
         }
 
         function checkEnabled() {
@@ -353,7 +383,7 @@ module.exports = function DeviceScreenDirective(
         // NOTE: instead of fa-pane-resize, a fa-child-pane-resize could be better
         scope.$on('fa-pane-resize', _.debounce(updateBounds, 1000))
         scope.$watch('device.using', checkEnabled)
-        scope.$on('visibilitychange', checkEnabled)
+        scope.$on('visibilitychange', handleVisibilityChange)
         scope.$watch('$parent.showScreen', checkEnabled)
 
         scope.retryLoadingScreen = function() {
