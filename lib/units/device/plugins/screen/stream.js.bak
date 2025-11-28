@@ -22,18 +22,14 @@ var RiskyStream = require('../../../../util/riskystream')
 var FailCounter = require('../../../../util/failcounter')
 
 module.exports = syrup.serial()
-  .dependency(require('../../resources/scrcpy'))
   .dependency(require('../../support/adb'))
   .dependency(require('../../resources/minicap'))
   .dependency(require('../util/display'))
   .dependency(require('./options'))
-  .define(function(options, scrcpy, adb, minicap, display, screenOptions) {
+  .define(function(options, adb, minicap, display, screenOptions) {
     var log = logger.createLogger('device:plugins:screen:stream')
     log.info('ScreenGrabber option set to %s', options.screenGrabber)
     log.info('ScreenFrameRate option set to %d', options.screenFrameRate)
-
-    // Scrcpy client for H.264 streaming
-    var scrcpyClient = options.needScrcpy ? new scrcpy.ScrcpyClient() : null
 
     function FrameProducer(config, grabber) {
       EventEmitter.call(this)
@@ -80,22 +76,6 @@ module.exports = syrup.serial()
       case FrameProducer.STATE_STOPPED:
         if (this.desiredState.next() === FrameProducer.STATE_STARTED) {
           this.runningState = FrameProducer.STATE_STARTING
-          if (options.needScrcpy && scrcpyClient) {
-            scrcpyClient.start()
-              .then((function() {
-                this.runningState = FrameProducer.STATE_STARTED
-                this.emit('start')
-              }).bind(this))
-              .catch((function(err) {
-                log.error('Scrcpy start failed:', err)
-                this.runningState = FrameProducer.STATE_STOPPED
-                this.failCounter.inc()
-              }).bind(this))
-              .finally((function() {
-                this._ensureState()
-              }).bind(this))
-          }
-          else {
           this._startService().bind(this)
             .then(function(out) {
               this.output = new RiskyStream(out)
@@ -134,7 +114,6 @@ module.exports = syrup.serial()
             .finally(function() {
               this._ensureState()
             })
-          }
         }
         else {
           setImmediate(this._ensureState.bind(this))
@@ -484,18 +463,6 @@ module.exports = syrup.serial()
         })
     }
 
-    // If needScrcpy is enabled, scrcpy-stream handles WebSocket, 
-    // so we just return a stub frameProducer for VNC compatibility
-    if (options.needScrcpy) {
-      log.info('needScrcpy enabled, skipping minicap WebSocket server')
-      var stubFrameProducer = new FrameProducer(
-        new FrameConfig(display.properties, display.properties)
-      , options.screenGrabber
-      )
-      stubFrameProducer.broadcastSet = new BroadcastSet()
-      return Promise.resolve(stubFrameProducer)
-    }
-
     return createServer()
       .then(function(wss) {
         log.info('creating FrameProducer: %s', options.screenGrabber)
@@ -627,18 +594,9 @@ module.exports = syrup.serial()
             }
           })
 
-          // Handle scrcpy raw H.264 data
-          if (options.needScrcpy && scrcpyClient) {
-            log.info('Scrcpy client configured for device %s', options.serial)
-            scrcpyClient.on('rawData', function(data) {
-              send(data, {binary: true})
-            })
-          }
-
           ws.on('close', function() {
             clearInterval(pingTimer)
             broadcastSet.remove(id)
-            log.info('WebSocket closed for device %s', options.serial)
           })
         })
 
