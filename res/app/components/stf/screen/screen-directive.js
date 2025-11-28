@@ -1,6 +1,8 @@
 var _ = require('lodash')
 var rotator = require('./rotator')
 var ImagePool = require('./imagepool')
+var StreamTypeDetector = require('./stream-type-detector')
+var H264RendererFactory = require('./h264-renderer')
 
 module.exports = function DeviceScreenDirective(
   $document
@@ -207,6 +209,18 @@ module.exports = function DeviceScreenDirective(
             onScreenInterestGained()
           }
           else {
+            // Stop H.264 renderer if active
+            if (scope.h264Renderer) {
+              try {
+                scope.h264Renderer.stop()
+                scope.h264Renderer = null
+                scope.streamType = null
+                console.log('[Screen] H.264 renderer stopped (checkEnabled)')
+              } catch (err) {
+                console.error('[Screen] Error stopping H.264 renderer:', err)
+              }
+            }
+            
             g.clearRect(0, 0, canvas.width, canvas.height)
             onScreenInterestLost()
           }
@@ -314,6 +328,9 @@ module.exports = function DeviceScreenDirective(
             maybeFlipLetterbox()
           }
 
+          // Initialize H.264 renderer factory
+          var h264RendererFactory = H264RendererFactory($window)
+          
           return function messageListener(message) {
             screen.rotation = device.display.rotation
 
@@ -325,48 +342,75 @@ module.exports = function DeviceScreenDirective(
                   })
                 }
 
-                var blob = new Blob([message.data], {
-                  type: 'image/jpeg'
-                })
-
-                var img = imagePool.next()
-
-                img.onload = function() {
-                  updateImageArea(this)
-
-                  g.drawImage(img, 0, 0, img.width, img.height)
-
-                  // Try to forcefully clean everything to get rid of memory
-                  // leaks. Note that despite this effort, Chrome will still
-                  // leak huge amounts of memory when the developer tools are
-                  // open, probably to save the resources for inspection. When
-                  // the developer tools are closed no memory is leaked.
-                  img.onload = img.onerror = null
-                  img.src = BLANK_IMG
-                  img = null
-                  blob = null
-
-                  URL.revokeObjectURL(url)
-                  url = null
+                // Detect stream type async (for Blob data)
+                if (!scope.streamType) {
+                  StreamTypeDetector.detectTypeAsync(message.data).then(function(detectedType) {
+                    scope.streamType = detectedType
+                    console.log('[Screen] Detected stream type:', scope.streamType)
+                    
+                    // Initialize H.264 renderer if needed
+                    if (scope.streamType === 'h264' && !scope.h264Renderer) {
+                      try {
+                        scope.h264Renderer = h264RendererFactory.create(canvas)
+                        scope.h264Renderer.start()
+                        console.log('[Screen] H.264 renderer initialized')
+                      } catch (err) {
+                        console.error('[Screen] Failed to initialize H.264 renderer:', err)
+                        scope.streamType = 'jpeg'
+                      }
+                    }
+                  })
                 }
 
-                img.onerror = function() {
-                  // Happily ignore. I suppose this shouldn't happen, but
-                  // sometimes it does, presumably when we're loading images
-                  // too quickly.
+                // Route to appropriate renderer
+                if (scope.streamType === 'h264' && scope.h264Renderer) {
+                  // H.264 path - send raw data to JSMpeg
+                  scope.h264Renderer.processData(message.data)
+                } else {
+                  // JPEG path - original rendering logic
+                  var blob = new Blob([message.data], {
+                    type: 'image/jpeg'
+                  })
 
-                  // Do the same cleanup here as in onload.
-                  img.onload = img.onerror = null
-                  img.src = BLANK_IMG
-                  img = null
-                  blob = null
+                  var img = imagePool.next()
 
-                  URL.revokeObjectURL(url)
-                  url = null
+                  img.onload = function() {
+                    updateImageArea(this)
+
+                    g.drawImage(img, 0, 0, img.width, img.height)
+
+                    // Try to forcefully clean everything to get rid of memory
+                    // leaks. Note that despite this effort, Chrome will still
+                    // leak huge amounts of memory when the developer tools are
+                    // open, probably to save the resources for inspection. When
+                    // the developer tools are closed no memory is leaked.
+                    img.onload = img.onerror = null
+                    img.src = BLANK_IMG
+                    img = null
+                    blob = null
+
+                    URL.revokeObjectURL(url)
+                    url = null
+                  }
+
+                  img.onerror = function() {
+                    // Happily ignore. I suppose this shouldn't happen, but
+                    // sometimes it does, presumably when we're loading images
+                    // too quickly.
+
+                    // Do the same cleanup here as in onload.
+                    img.onload = img.onerror = null
+                    img.src = BLANK_IMG
+                    img = null
+                    blob = null
+
+                    URL.revokeObjectURL(url)
+                    url = null
+                  }
+
+                  var url = URL.createObjectURL(blob)
+                  img.src = url
                 }
-
-                var url = URL.createObjectURL(blob)
-                img.src = url
               }
             }
             else if (/^start /.test(message.data)) {

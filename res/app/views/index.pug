@@ -30,5 +30,7 @@ html(ng-app='app')
           div(growl)
           div(ng-view).fill-height
 
+    //- JSMpeg for H.264 video decoding (scrcpy support)
+    script(src='static/app/components/stf/screen/jsmpeg.min.js')
     script(src='/app/api/v1/state.js')
     script(src='static/app/build/entry/app.entry.js')
