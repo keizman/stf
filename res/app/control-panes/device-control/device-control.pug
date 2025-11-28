@@ -1,8 +1,8 @@
 .interact-control.fill-height.as-table.stf-device-control(ng-controller='DeviceControlCtrl')
   .as-cell.fill-height
     .as-table.fill-height
-      .stf-vnc-navbar.as-row(ng-show='!$root.basicMode && !$root.standalone')
-        .stf-vnc-control-header.as-cell
+      .stf-vnc-navbar.as-row(ng-show='!$root.basicMode && !$root.standalone', ng-class='{"collapsed": deviceHeaderCollapsed}', ng-click='deviceHeaderCollapsed && toggleDeviceHeader()')
+        .stf-vnc-control-header.as-cell(ng-hide='deviceHeaderCollapsed')
           .stf-vnc-right-buttons.pull-right
             .btn-group
               label.btn-sm.btn-primary-outline(type='button', ng-click='tryToRotate("portrait")',
@@ -19,6 +19,8 @@
               i(ng-show='!showScreen', uib-tooltip='{{"Show Screen"|translate}}', tooltip-placement='bottom').fa.fa-eye-slash
             button(type='button', ng-click='kickDevice(device); $event.stopPropagation()', uib-tooltip='{{"Stop Using"|translate}}', tooltip-placement='bottom').btn.btn-sm.btn-danger-outline
               i.fa.fa-times
+            button(type='button', ng-click='toggleFullscreen(); $event.stopPropagation()', uib-tooltip='{{"Fullscreen Mode"|translate}}', tooltip-placement='bottom').btn.btn-sm.btn-primary-outline
+              i.fa.fa-arrows-alt
 
           .device-name-container.pull-left(uib-dropdown)
             a.stf-vnc-device-name.pointer.unselectable(uib-dropdown-toggle)

@@ -2,8 +2,8 @@
   Copyright © 2019-2024 contains code contributed by Orange SA, authors: Denis Barbaron - Licensed under the Apache license 2.0
 //
 
-.navbar.stf-menu(ng-controller='MenuCtrl')
-  .container-fluid.stf-top-bar
+.navbar.stf-menu(ng-controller='MenuCtrl', ng-class='{"collapsed": mainHeaderCollapsed}', ng-click='mainHeaderCollapsed && toggleMainHeader()')
+  .container-fluid.stf-top-bar(ng-hide='mainHeaderCollapsed')
     a.stf-logo(ng-href="/#!/devices") STF
     ul.nav.stf-nav(nav-menu='current').unselectable
       li(ng-cloak)

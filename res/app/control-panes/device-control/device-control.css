@@ -250,6 +250,30 @@ device-screen input {
 .stf-vnc-navbar {
   background: #fff;
   margin-bottom: 2px;
+  position: relative;
+}
+
+/* Collapsible device header styles */
+.stf-vnc-navbar.collapsed {
+  height: 16px !important;
+  min-height: 16px !important;
+  cursor: pointer;
+  background: linear-gradient(to bottom, #f8f8f8, #eee);
+}
+
+.stf-vnc-navbar.collapsed::after {
+  content: '\f078';
+  font-family: FontAwesome;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  color: #777;
+}
+
+.stf-vnc-navbar.collapsed:hover {
+  background: linear-gradient(to bottom, #eee, #ddd);
 }
 
 .stf-vnc-fps {

@@ -19,6 +19,20 @@ module.exports = function MenuCtrl(
   $window.angular.version = {}
   $window.d3.version = {}
 
+  // Header collapse state - default to false (not collapsed)
+  $scope.mainHeaderCollapsed = false
+  
+  $scope.toggleMainHeader = function() {
+    $scope.mainHeaderCollapsed = !$scope.mainHeaderCollapsed
+    localStorage.setItem('mainHeaderCollapsed', $scope.mainHeaderCollapsed)
+  }
+
+  // Listen for fullscreen event from device control
+  $rootScope.$on('collapseMainHeader', function() {
+    $scope.mainHeaderCollapsed = true
+    localStorage.setItem('mainHeaderCollapsed', 'true')
+  })
+
   SettingsService.bind($scope, {
     target: 'lastUsedDevice'
   })

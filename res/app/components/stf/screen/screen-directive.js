@@ -96,8 +96,10 @@ module.exports = function DeviceScreenDirective(
 
         var options = {
           autoScaleForRetina: true
-        , density: Math.max(1, Math.min(1.5, devicePixelRatio || 1))
-        , minscale: 0.80
+        // Higher density = better quality (max 3.0 for HiDPI screens)
+        , density: Math.max(1.5, Math.min(3.0, devicePixelRatio || 1))
+        // Use at least device native resolution
+        , minscale: 1.0
         }
 
         var adjustedBoundSize
@@ -108,18 +110,39 @@ module.exports = function DeviceScreenDirective(
 
         function updateBounds() {
           function adjustBoundedSize(w, h) {
-            var sw = w * options.density
-            var sh = h * options.density
-            var f
-
-            if (sw < (f = device.display.width * options.minscale)) {
-              sw *= f / sw
-              sh *= f / sh
+            // Keep device aspect ratio for better quality
+            var deviceW = device.display.width
+            var deviceH = device.display.height
+            var deviceAspect = deviceW / deviceH
+            var containerAspect = w / h
+            var sw, sh
+            
+            // Fit to container while maintaining aspect ratio
+            if (containerAspect > deviceAspect) {
+              sh = h * options.density
+              sw = sh * deviceAspect
+            } else {
+              sw = w * options.density
+              sh = sw / deviceAspect
             }
 
-            if (sh < (f = device.display.height * options.minscale)) {
-              sw *= f / sw
-              sh *= f / sh
+            // Ensure at least native resolution for crisp display
+            var minW = deviceW * options.minscale
+            var minH = deviceH * options.minscale
+            
+            if (sw < minW || sh < minH) {
+              var scale = Math.max(minW / sw, minH / sh)
+              sw *= scale
+              sh *= scale
+            }
+            
+            // Cap at 2x native resolution to save bandwidth
+            var maxW = deviceW * 2
+            var maxH = deviceH * 2
+            if (sw > maxW || sh > maxH) {
+              var capScale = Math.min(maxW / sw, maxH / sh)
+              sw *= capScale
+              sh *= capScale
             }
 
             return {

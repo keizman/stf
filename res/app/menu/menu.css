@@ -121,3 +121,26 @@
   }
 }
 
+/* Collapsible header styles */
+.stf-menu.navbar.collapsed {
+  height: 16px !important;
+  min-height: 16px !important;
+  cursor: pointer;
+  background: linear-gradient(to bottom, #f8f8f8, #eee);
+}
+
+.stf-menu.navbar.collapsed::after {
+  content: '\f078';
+  font-family: FontAwesome;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  color: #777;
+}
+
+.stf-menu.navbar.collapsed:hover {
+  background: linear-gradient(to bottom, #eee, #ddd);
+}
+

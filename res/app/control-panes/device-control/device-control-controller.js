@@ -5,6 +5,24 @@ module.exports = function DeviceControlCtrl($scope, DeviceService, GroupService,
 
   $scope.showScreen = true
 
+  // Device control header collapse state - default to false (not collapsed)
+  $scope.deviceHeaderCollapsed = false
+  
+  $scope.toggleDeviceHeader = function() {
+    $scope.deviceHeaderCollapsed = !$scope.deviceHeaderCollapsed
+    localStorage.setItem('deviceHeaderCollapsed', $scope.deviceHeaderCollapsed)
+  }
+
+  // Fullscreen mode - collapse both headers
+  $scope.toggleFullscreen = function() {
+    // Collapse both headers
+    $scope.deviceHeaderCollapsed = true
+    localStorage.setItem('deviceHeaderCollapsed', 'true')
+    
+    // Also collapse main header by broadcasting event to parent scope
+    $rootScope.$broadcast('collapseMainHeader')
+  }
+
   $scope.groupTracker = DeviceService.trackGroup($scope)
 
   $scope.groupDevices = $scope.groupTracker.devices
