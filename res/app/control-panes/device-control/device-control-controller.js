@@ -119,6 +119,50 @@ module.exports = function DeviceControlCtrl($scope, DeviceService, GroupService,
 
   $scope.currentRotation = 'portrait'
 
+  // Screen rotation lock state
+  // accelerometer_rotation: 1 = auto-rotate enabled (unlocked), 0 = locked
+  $scope.rotationLocked = false
+
+  // Get initial rotation lock state
+  function getRotationLockState() {
+    if ($scope.control && $scope.control.shell) {
+      $scope.control.shell('settings get system accelerometer_rotation')
+        .then(function(result) {
+          // Result is '1' for auto-rotate enabled (unlocked), '0' for locked
+          var value = (result.output || '').trim()
+          $scope.rotationLocked = (value === '0')
+          $scope.$apply()
+        })
+        .catch(function(err) {
+          console.error('Failed to get rotation lock state:', err)
+        })
+    }
+  }
+
+  // Toggle rotation lock
+  $scope.toggleRotationLock = function() {
+    if ($scope.control && $scope.control.shell) {
+      var newValue = $scope.rotationLocked ? '1' : '0'
+      $scope.control.shell('settings put system accelerometer_rotation ' + newValue)
+        .then(function() {
+          $scope.rotationLocked = !$scope.rotationLocked
+          $scope.$apply()
+        })
+        .catch(function(err) {
+          console.error('Failed to toggle rotation lock:', err)
+        })
+    }
+  }
+
+  // Get rotation lock state when control is available
+  $scope.$watch('control', function(newControl) {
+    if (newControl && newControl.shell) {
+      $timeout(function() {
+        getRotationLockState()
+      }, 500)
+    }
+  })
+
   $scope.$watch('device.display.rotation', function(newValue) {
     if (isPortrait(newValue)) {
       $scope.currentRotation = 'portrait'

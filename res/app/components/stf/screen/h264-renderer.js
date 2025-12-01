@@ -177,7 +177,9 @@ WebCodecsRenderer.prototype.getVideoDimensions = function() {
 }
 
 WebCodecsRenderer.prototype.configure = function(width, height, sps, pps) {
-  if (!this.decoder) {
+  // Check if we need to recreate decoder
+  if (!this.decoder || this.decoder.state === 'closed') {
+    console.log('[WebCodecs] Decoder missing or closed, recreating...')
     this._createDecoder()
     if (!this.decoder) return
   }
@@ -203,6 +205,10 @@ WebCodecsRenderer.prototype.configure = function(width, height, sps, pps) {
   this.offscreenCanvas.height = height
 
   var config = this._buildAVCConfig(sps, pps)
+  if (!config) {
+    console.error('[WebCodecs] Failed to build avcC config')
+    return
+  }
 
   try {
     // Reset decoder if already configured
@@ -210,8 +216,25 @@ WebCodecsRenderer.prototype.configure = function(width, height, sps, pps) {
       this.decoder.reset()
     }
     
+    // Build codec string from SPS profile
+    var spsOffset = 0
+    if (sps.length > 4 && sps[0] === 0 && sps[1] === 0 && sps[2] === 0 && sps[3] === 1) {
+      spsOffset = 4
+    } else if (sps.length > 3 && sps[0] === 0 && sps[1] === 0 && sps[2] === 1) {
+      spsOffset = 3
+    }
+    var profile = sps[spsOffset + 1]
+    var compat = sps[spsOffset + 2]
+    var level = sps[spsOffset + 3]
+    var codecString = 'avc1.' + 
+      profile.toString(16).padStart(2, '0') +
+      compat.toString(16).padStart(2, '0') +
+      level.toString(16).padStart(2, '0')
+    
+    console.log('[WebCodecs] Using codec:', codecString)
+    
     this.decoder.configure({
-      codec: 'avc1.42E01E',
+      codec: codecString,
       codedWidth: width,
       codedHeight: height,
       description: config,
@@ -225,27 +248,44 @@ WebCodecsRenderer.prototype.configure = function(width, height, sps, pps) {
   } catch (e) {
     console.error('[WebCodecs] Configure error:', e)
     this.isConfigured = false
+    // Recreate decoder on error
+    this._createDecoder()
   }
 }
 
 WebCodecsRenderer.prototype._buildAVCConfig = function(sps, pps) {
   // Find start code offset
   var spsOffset = 0
-  if (sps[0] === 0 && sps[1] === 0 && sps[2] === 0 && sps[3] === 1) {
+  if (sps.length > 4 && sps[0] === 0 && sps[1] === 0 && sps[2] === 0 && sps[3] === 1) {
     spsOffset = 4
-  } else if (sps[0] === 0 && sps[1] === 0 && sps[2] === 1) {
+  } else if (sps.length > 3 && sps[0] === 0 && sps[1] === 0 && sps[2] === 1) {
     spsOffset = 3
   }
   
   var ppsOffset = 0
-  if (pps[0] === 0 && pps[1] === 0 && pps[2] === 0 && pps[3] === 1) {
+  if (pps.length > 4 && pps[0] === 0 && pps[1] === 0 && pps[2] === 0 && pps[3] === 1) {
     ppsOffset = 4
-  } else if (pps[0] === 0 && pps[1] === 0 && pps[2] === 1) {
+  } else if (pps.length > 3 && pps[0] === 0 && pps[1] === 0 && pps[2] === 1) {
     ppsOffset = 3
   }
   
   var spsData = sps.slice(spsOffset)
   var ppsData = pps.slice(ppsOffset)
+  
+  // Validate SPS data
+  if (spsData.length < 4) {
+    console.error('[WebCodecs] Invalid SPS data length:', spsData.length)
+    return null
+  }
+  
+  // Check NAL type (should be 7 for SPS)
+  var spsNalType = spsData[0] & 0x1f
+  if (spsNalType !== 7) {
+    console.warn('[WebCodecs] SPS NAL type mismatch:', spsNalType)
+  }
+  
+  console.log('[WebCodecs] Building avcC: SPS len=' + spsData.length + ', PPS len=' + ppsData.length)
+  console.log('[WebCodecs] SPS profile=' + spsData[1] + ', compat=' + spsData[2] + ', level=' + spsData[3])
   
   var config = new Uint8Array(11 + spsData.length + ppsData.length)
   var offset = 0
@@ -554,18 +594,23 @@ FallbackRenderer.prototype._updateDisplay = function() {
 
 /**
  * Factory
+ * Returns WebCodecs renderer if available, null otherwise (to trigger minicap fallback)
  */
 function H264RendererFactory($window) {
   var webCodecsSupported = typeof $window.VideoDecoder !== 'undefined'
   console.log('[H264Factory] WebCodecs supported:', webCodecsSupported)
   
   return {
-    isSupported: function() { return true },
+    isSupported: function() { 
+      return webCodecsSupported 
+    },
     create: function(canvas) {
       if (webCodecsSupported) {
+        console.log('[H264Factory] Using WebCodecs renderer')
         return new WebCodecsRenderer(canvas)
       } else {
-        return new FallbackRenderer(canvas)
+        console.log('[H264Factory] WebCodecs not available, will fallback to minicap')
+        return null  // Return null to signal fallback to minicap
       }
     }
   }

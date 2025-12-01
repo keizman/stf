@@ -4,6 +4,12 @@
       .stf-vnc-navbar.as-row(ng-show='!$root.basicMode && !$root.standalone', ng-class='{"collapsed": deviceHeaderCollapsed}', ng-click='deviceHeaderCollapsed && toggleDeviceHeader()')
         .stf-vnc-control-header.as-cell(ng-hide='deviceHeaderCollapsed')
           .stf-vnc-right-buttons.pull-right
+            button.btn.btn-sm(type='button', ng-click='toggleRotationLock(); $event.stopPropagation()',
+              ng-class='{"btn-info": rotationLocked, "btn-primary-outline": !rotationLocked}',
+              uib-tooltip='{{ rotationLocked ? ("Unlock Rotation"|translate) : ("Lock Rotation"|translate) }}', tooltip-placement='bottom')
+              i.fa.fa-lock(ng-show='rotationLocked')
+              i.fa.fa-unlock(ng-show='!rotationLocked')
+            .button-spacer
             .btn-group
               label.btn-sm.btn-primary-outline(type='button', ng-click='tryToRotate("portrait")',
               ng-model='currentRotation', uib-btn-radio='"portrait"',

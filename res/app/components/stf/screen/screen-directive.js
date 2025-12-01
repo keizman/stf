@@ -109,6 +109,9 @@ module.exports = function DeviceScreenDirective(
         var hiddenTimer = null
         var shouldStopDueToHidden = false
         var HIDDEN_DELAY = 60000 // 1 minute in milliseconds
+        
+        // Initialize H.264 renderer factory early for WebCodecs detection
+        var h264RendererFactory = H264RendererFactory($window)
 
         function updateBounds() {
           function adjustBoundedSize(w, h) {
@@ -249,7 +252,15 @@ module.exports = function DeviceScreenDirective(
         function onScreenInterestGained() {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send('size ' + adjustedBoundSize.w + 'x' + adjustedBoundSize.h)
-            ws.send('on')
+            // Check WebCodecs support before connecting
+            var webCodecsSupported = h264RendererFactory.isSupported()
+            if (webCodecsSupported) {
+              console.log('[Screen] WebCodecs supported, requesting H.264 stream')
+              ws.send('on:h264')
+            } else {
+              console.log('[Screen] WebCodecs not supported, requesting JPEG stream')
+              ws.send('on:jpeg')
+            }
           }
         }
 
@@ -346,19 +357,21 @@ module.exports = function DeviceScreenDirective(
             maybeFlipLetterbox()
           }
 
-          // Initialize H.264 renderer
-          var h264RendererFactory = H264RendererFactory($window)
+          // H.264 renderer instance
           var h264Renderer = null
           var streamType = null  // 'jpeg' or 'h264'
           var streamTypeDetected = false
+          var fallbackToMinicap = false  // True when WebCodecs unavailable and switched to minicap
 
           function initH264Renderer() {
             console.log('[Screen] initH264Renderer called, supported:', h264RendererFactory.isSupported())
             if (!h264Renderer && h264RendererFactory.isSupported()) {
               h264Renderer = h264RendererFactory.create(canvas)
-              var started = h264Renderer.start()
-              console.log('[Screen] H264 renderer started:', started)
-              console.log('[Screen] H.264 renderer initialized')
+              if (h264Renderer) {
+                var started = h264Renderer.start()
+                console.log('[Screen] H264 renderer started:', started)
+                console.log('[Screen] H.264 renderer initialized')
+              }
             }
           }
 
@@ -408,11 +421,10 @@ module.exports = function DeviceScreenDirective(
 
                 // Route to appropriate renderer
                 if (streamType === 'h264' && h264Renderer) {
-                  // H.264 path
-                  console.log('[Screen] Routing to H264 renderer')
+                  // H.264 path (WebCodecs available)
                   h264Renderer.processData(message.data)
-                } else {
-                  // JPEG path (default)
+                } else if (streamType === 'jpeg' || !h264Renderer) {
+                  // JPEG path (default minicap mode)
                   var blob = new Blob([message.data], {
                     type: 'image/jpeg'
                   })
@@ -461,7 +473,7 @@ module.exports = function DeviceScreenDirective(
             else if (/^start /.test(message.data)) {
               var startData = JSON.parse(message.data.substr('start '.length))
               
-              // Check if this is H.264 stream info
+              // Check stream type
               if (startData.type === 'h264') {
                 streamType = 'h264'
                 streamTypeDetected = true
@@ -470,6 +482,17 @@ module.exports = function DeviceScreenDirective(
                   h264Renderer.setSize(startData.width, startData.height)
                 }
                 console.log('[Screen] H.264 stream started:', startData.width, 'x', startData.height)
+              } else if (startData.type === 'jpeg') {
+                // Switched to JPEG mode (fallback from H.264)
+                streamType = 'jpeg'
+                streamTypeDetected = true
+                fallbackToMinicap = true
+                if (h264Renderer) {
+                  h264Renderer.stop()
+                  h264Renderer = null
+                }
+                console.log('[Screen] JPEG stream started (fallback):', startData.width, 'x', startData.height)
+                applyQuirks(startData)
               } else {
                 applyQuirks(startData)
               }
