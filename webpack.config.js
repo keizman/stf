@@ -42,6 +42,10 @@ module.exports = {
             , stats: 'stats.js/src/Stats.js'
             , 'underscore.string': 'underscore.string/index'
         }
+        , fallback: {
+            'stream': false
+            , 'buffer': false
+        }
     }
     , module: {
         rules: [

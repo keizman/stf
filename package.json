@@ -76,6 +76,7 @@
     "jmuxer": "^2.1.0",
     "jws": "^3.1.0",
     "ldapjs": "^1.0.0",
+    "libav.js": "^6.8.8",
     "lodash": "^4.17.21",
     "machinepack-http": "^9.0.0",
     "markdown-serve": "^0.9.0",

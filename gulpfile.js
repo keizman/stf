@@ -243,7 +243,30 @@ gulp.task('clean', function(cb) {
   ], cb)
 })
 
-gulp.task('build', gulp.parallel('clean', 'webpack:build'))
+// Copy Broadway WASM file for H.264 decoding
+gulp.task('copy:broadway-wasm', function() {
+  var fs = require('fs')
+  var path = require('path')
+  var src = path.join(__dirname, 'Broadway/Player/avc.wasm')
+  var dest = path.join(__dirname, 'res/build/avc.wasm')
+  
+  // Ensure build directory exists
+  var buildDir = path.join(__dirname, 'res/build')
+  if (!fs.existsSync(buildDir)) {
+    fs.mkdirSync(buildDir, { recursive: true })
+  }
+  
+  if (fs.existsSync(src)) {
+    fs.copyFileSync(src, dest)
+    console.log('Copied avc.wasm to res/build/')
+  }
+  return Promise.resolve()
+})
+
+gulp.task('build', gulp.series(
+  gulp.parallel('clean', 'webpack:build'),
+  'copy:broadway-wasm'
+))
 gulp.task('lint', gulp.parallel('jsonlint', 'eslint-cli'))
 gulp.task('test', gulp.parallel('lint', 'run:checkversion'))
 gulp.task('translate', gulp.parallel(
