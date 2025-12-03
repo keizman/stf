@@ -226,12 +226,15 @@ WebCodecsRenderer.prototype.configure = function(width, height, sps, pps) {
     var profile = sps[spsOffset + 1]
     var compat = sps[spsOffset + 2]
     var level = sps[spsOffset + 3]
-    var codecString = 'avc1.' + 
-      profile.toString(16).padStart(2, '0') +
-      compat.toString(16).padStart(2, '0') +
-      level.toString(16).padStart(2, '0')
     
-    console.log('[WebCodecs] Using codec:', codecString)
+    // Format as hex with leading zeros
+    function toHex(n) {
+      var hex = n.toString(16)
+      return hex.length === 1 ? '0' + hex : hex
+    }
+    var codecString = 'avc1.' + toHex(profile) + toHex(compat) + toHex(level)
+    
+    console.log('[WebCodecs] Using codec:', codecString, 'profile:', profile, 'compat:', compat, 'level:', level)
     
     this.decoder.configure({
       codec: codecString,

@@ -9,13 +9,5 @@ services:
         - "rethinkdb-data:/data"
     command: "rethinkdb --bind all --cache-size 2048"
 
-  adb:
-    container_name: adb
-    image: devicefarmer/adb:latest
-    restart: unless-stopped
-    volumes: 
-      - "/dev/bus/usb:/dev/bus/usb"
-    privileged: true
-
 volumes:
   rethinkdb-data: {}

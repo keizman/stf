@@ -90,11 +90,18 @@ module.exports = function InstallService(
 
   installService.installFile = function(control, $files) {
     var installation = new Installation('uploading')
-    let isIOSPlatform = AppState.device.platform === 'iOS'
+    var isIOSPlatform = AppState.device.platform === 'iOS'
+    var originalFileName = $files[0] ? $files[0].name : 'unknown'
+    var isApkFile = /\.(apk|aab)$/i.test(originalFileName)
+    var isIpaFile = /\.(ipa)$/i.test(originalFileName)
+    
     $rootScope.$broadcast('installation', installation)
+    
+    // Accept APK/AAB for Android, IPA for iOS, or any file for push
     return StorageService.storeFile('apk', $files, {
         filter: function(file) {
-          return isIOSPlatform ? /\.(ipa)$/i.test(file.name) : /\.(apk|aab)$/i.test(file.name)
+          // Allow all files - APK/AAB/IPA will be installed, others will be pushed
+          return true
         }
     })
       .progressed(function(e) {
@@ -105,7 +112,9 @@ module.exports = function InstallService(
       .then(function(res) {
         installation.update(100 / 2, 'processing')
         installation.href = res.data.resources.file.href
-        if(isIOSPlatform) {
+        
+        if (isIOSPlatform && isIpaFile) {
+          // iOS IPA installation
           installation.manifest = {'application': {'activities': {}}}
           return control.install({
             href: installation.href,
@@ -115,21 +124,21 @@ module.exports = function InstallService(
             .progressed(function(result) {
               installation.update(50 + result.progress / 2, result.lastData)
             })
-        } else {
+        } else if (isApkFile) {
+          // Android APK/AAB installation
           return $http.get(installation.href + '/manifest')
             .then(function(res) {
               if (res.data.success) {
                 installation.manifest = res.data.manifest
-              }
-              else {
-                // Use default manifest if unable to read from APK
-                // Installation will proceed using adb install -r -d -t
+              } else {
                 console.warn('Unable to retrieve manifest, using default manifest')
                 installation.manifest = {
                   package: 'unknown',
                   application: { launcherActivities: [] }
                 }
               }
+              // Add originalFileName so backend knows file type
+              installation.manifest.originalFileName = originalFileName
               return control.install({
                 href: installation.href,
                 manifest: installation.manifest,
@@ -139,10 +148,26 @@ module.exports = function InstallService(
                   installation.update(50 + result.progress / 2, result.lastData)
                 })
             })
+        } else {
+          // Non-APK file: push to /data/local/tmp
+          installation.manifest = {
+            package: originalFileName,
+            application: { launcherActivities: [] },
+            isPushOnly: true,
+            originalFileName: originalFileName
+          }
+          return control.install({
+            href: installation.href,
+            manifest: installation.manifest,
+            launch: false
+          })
+            .progressed(function(result) {
+              installation.update(50 + result.progress / 2, result.lastData)
+            })
         }
       })
       .then(function() {
-        installation.okay('installed')
+        installation.okay(isApkFile || isIpaFile ? 'installed' : 'pushed')
       })
       .catch(function(err) {
         installation.fail(err.code || err.message)

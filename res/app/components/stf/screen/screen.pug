@@ -1,6 +1,11 @@
 div.positioner
   canvas.screen(ng-show='device')
   canvas.hacky-stretcher(width=1, height=1)
+div(ng-if='screenLoading && !displayError').screen-loading-overlay
+  .screen-loading-spinner
+    i.fa.fa-spinner.fa-spin.fa-3x
+  .screen-loading-text
+    span(translate) Loading device screen...
 div(ng-if='displayError').screen-error
   .screen-error-message
     nothing-to-show(message='{{"No device screen"|translate}}', icon='fa-eye-slash', ng-show='true')

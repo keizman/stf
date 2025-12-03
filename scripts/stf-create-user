@@ -1,0 +1,43 @@
+#!/bin/bash
+# STF 快速创建用户工具
+# 使用方法: stf-create-user <email> <name>
+
+# 获取脚本实际路径（处理符号链接）
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ $SCRIPT_PATH != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+STF_DIR="$(dirname "$SCRIPT_DIR")"
+
+if [ $# -lt 2 ]; then
+    echo "用法: stf-create-user <email> <name>"
+    echo ""
+    echo "参数顺序: 邮箱在前，姓名在后"
+    echo ""
+    echo "示例:"
+    echo "  stf-create-user zhang.san@company.com \"张三\""
+    echo "  stf-create-user li.si@company.com \"李四\""
+    echo ""
+    echo "错误示例（顺序错误）:"
+    echo "  stf-create-user \"张三\" zhang.san@company.com  ❌"
+    exit 1
+fi
+
+EMAIL="$1"
+NAME="$2"
+
+# 简单验证邮箱格式
+if [[ ! "$EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+    echo "错误: 邮箱格式不正确: $EMAIL"
+    echo ""
+    echo "提示: 如果参数顺序反了，请使用:"
+    echo "  stf-create-user $NAME \"$EMAIL\""
+    exit 1
+fi
+
+cd "$STF_DIR"
+node scripts/create-user.js "$EMAIL" "$NAME"
+

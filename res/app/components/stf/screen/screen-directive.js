@@ -40,6 +40,9 @@ module.exports = function DeviceScreenDirective(
         }
       }
 
+      // Add loading state
+      scope.screenLoading = true
+
       var scaler = ScalingService.coordinator(
         device.display.width
       , device.display.height
@@ -423,6 +426,13 @@ module.exports = function DeviceScreenDirective(
                 if (streamType === 'h264' && h264Renderer) {
                   // H.264 path (WebCodecs available)
                   h264Renderer.processData(message.data)
+                  
+                  // Hide loading indicator on first frame
+                  if (scope.screenLoading) {
+                    scope.$apply(function() {
+                      scope.screenLoading = false
+                    })
+                  }
                 } else if (streamType === 'jpeg' || !h264Renderer) {
                   // JPEG path (default minicap mode)
                   var blob = new Blob([message.data], {
@@ -435,6 +445,13 @@ module.exports = function DeviceScreenDirective(
                     updateImageArea(this)
 
                     g.drawImage(img, 0, 0, img.width, img.height)
+
+                    // Hide loading indicator on first frame
+                    if (scope.screenLoading) {
+                      scope.$apply(function() {
+                        scope.screenLoading = false
+                      })
+                    }
 
                     // Try to forcefully clean everything to get rid of memory
                     // leaks. Note that despite this effort, Chrome will still
